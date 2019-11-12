@@ -16,9 +16,9 @@ import callbacks
 @cli.command()
 @click.option("--name", default="Classify")
 @click.option("--observer", default=None)
-@click.option("--tensorboard", default=True)
+@click.option("--tb-graph", default=True)
 @build_train()
-def train(build_model, dataset, hparams, logdir, name, observer, tensorboard):
+def train(build_model, dataset, hparams, logdir, name, observer, tb_graph):
     
     # Check if the given directory already contains model
     if os.path.exists(f"{logdir}/stats.json"):
@@ -33,7 +33,7 @@ def train(build_model, dataset, hparams, logdir, name, observer, tensorboard):
                                 datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
         os.makedirs(model_dir, exist_ok=True)
     model_path = os.path.join(model_dir, "model")
-
+    
 
     # Check if any observers are added for experiment.
     # If not, add a file_storage observer
@@ -63,17 +63,43 @@ def train(build_model, dataset, hparams, logdir, name, observer, tensorboard):
         # Print Summary of models
         lq.models.summary(model)
 
-        # Enable callbacks
-        cb = [callbacks.ModelCheckpoint(ex, filepath=model_path, save_weights_only=True)]
-        # cb = [callbacks.ModelCheckpoint(filepath=model_path, save_weights_only=True)]
-
         # If the model already exists, load it and continue training
         initial_epoch = 0
-        if os.path.exists(os.path.join(logdir, "stats.json")):
-            with open(os.path.join(logdir, "stats.json"), "r") as stats_file:
+        if os.path.exists(os.path.join(model_dir, "stats.json")):
+            with open(os.path.join(model_dir, "stats.json"), "r") as stats_file:
                 initial_epoch = json.load(stats_file)["epoch"]
-            model.load_weights(model_path)
-            click.echo(f"Restoring model {model_path} at epoch = {initial_epoch}")
+                click.echo(f"Restoring model {model_path} at epoch = {initial_epoch}")
+                model.load_weights(model_path)
+
+
+        # Enable callbacks
+        cb = [callbacks.ModelCheckpoint(filepath=model_path, save_weights_only=True)]
+        if tb_graph:
+            # If tensorboard logging is enabled, write graph
+            cb.extend(
+                [
+                    tf.keras.callbacks.TensorBoard(
+                        log_dir=os.path.join(model_dir, "tb"),
+                        write_graph=tb_graph,
+                        histogram_freq=0,
+                        update_freq='epoch',
+                        # update_freq=0,
+                        profile_batch=0,
+                        embeddings_freq=0
+                    ),
+                ]
+            )
+        
+        # Callback for sending data to Sacred Experiment
+        cb.extend([
+            tf.keras.callbacks.LambdaCallback(
+                on_epoch_end=lambda epoch, logs:
+                    [ 
+                        ex.log_scalar(metric, value, epoch + 1) for (metric, value) in logs.items()
+                    ]
+            )
+        ])
+
 
         # Train this mode
         train_log = model.fit(
