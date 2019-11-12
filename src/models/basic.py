@@ -90,3 +90,7 @@ class lenet5(default):
     filters = [6, 16]
     kernel_size = (5, 5)
     hidden_units = [120, 84]
+
+
+
+
