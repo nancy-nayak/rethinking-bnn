@@ -23,7 +23,6 @@ class Experiment(sacred.Experiment):
         # Build sacred configuration for this experiment
         ex_cfg = {}
         for (param, value) in hparams.items():
-            print(param, type(value), callable(value))
             if not callable(value): # Filter out all non callable parameters
                 if type(value) is dict:
                     # If the hyper-parameter is specified as a dictionary,
@@ -34,10 +33,12 @@ class Experiment(sacred.Experiment):
                     ex_cfg[param] = value
         ex_cfg["dataset"] = dataset
         ex_cfg["model"] = model
-        print(ex_cfg)
         
         # To disable logging of output to screen
         self.captured_out_filter = lambda captured_output: "Output capturing turned off." 
+        
+        # @TODO: Disable source file logging or point to called script
+        # self.add_source_file("")
         
         # Add the configuration
         self.add_config(ex_cfg)
@@ -46,7 +47,6 @@ class Experiment(sacred.Experiment):
         self.observer = observer
 
     def execute(self):
-        print("executing ")
         # build argv for sacred -- hacky way!
         _argv = f"{self.default_command} --{self.observer}"
         # _argv = f"{self.default_command}"
