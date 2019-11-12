@@ -16,7 +16,7 @@ import callbacks
 @cli.command()
 @click.option("--name", default="Classify")
 @click.option("--observer", default=None)
-@click.option("--tb-graph", default=True)
+@click.option("--tb-graph", is_flag=True)
 @build_train()
 def train(build_model, dataset, hparams, logdir, name, observer, tb_graph):
     
