@@ -3,9 +3,15 @@
 import os, json
 import tensorflow as tf
 
-class ModelCheckpoint(tf.keras.callbacks.ModelCheckpoint):
-    def on_epoch_end(self, epoch, logs=None):
-        super().on_epoch_end(epoch, logs=logs)
-        with open(os.path.join(os.path.dirname(self.filepath), "stats.json"), "w") as stats_file:
-            # Save current epoch
-            json.dump({"epoch": epoch + 1}, stats_file)
+class SaveStats(tf.keras.callbacks.LambdaCallback):
+    def __init__(self, model_dir):
+        self.model_dir = model_dir
+        self.stats_file = os.path.join(model_dir, "stats.json")
+        self.weights_file = os.path.join(model_dir, "weights.h5")
+        
+        def save_stats(epoch, logs=None):
+            self.model.save_weights(self.weights_file)
+            with open(self.stats_file, "w") as f:
+                json.dump({"epoch": epoch + 1}, f)
+        
+        super().__init__(on_epoch_end=save_stats)
