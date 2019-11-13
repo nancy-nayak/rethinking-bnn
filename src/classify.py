@@ -68,7 +68,7 @@ def train(build_model, dataset, hparams, logdir, name, observer, tb_graph):
         if os.path.exists(os.path.join(model_dir, "stats.json")):
             with open(os.path.join(model_dir, "stats.json"), "r") as stats_file:
                 initial_epoch = json.load(stats_file)["epoch"]
-                click.echo(f"Restoring model {model_path} at epoch = {initial_epoch}")
+                click.echo(f"Restoring model from {model_path} at epoch = {initial_epoch}")
                 model.load_weights(model_path)
 
 
@@ -113,9 +113,6 @@ def train(build_model, dataset, hparams, logdir, name, observer, tb_graph):
                         initial_epoch=initial_epoch,
                         callbacks=cb
                     )
-        
-        # Save the model
-        # not required as ModelCheckpoint already does this
 
     # Execute the experiment
     ex.execute()
@@ -130,9 +127,8 @@ def test(build_model, dataset, hparams, logdir):
         model_dir = logdir
     else:
         # Raise Error
-        raise RuntimeError("No valid model stats file found in directory", logdir)
-		
-    model_path = os.path.join(model_dir, "model")
+        raise RuntimeError(f"No valid model stats file found in {logdir}")	
+    model_path = os.path.join(model_dir, "weights.h5")
 
     # Build model
     model = build_model(hparams, **dataset.preprocessing.kwargs)
@@ -148,9 +144,8 @@ def test(build_model, dataset, hparams, logdir):
     lq.models.summary(model)
 
     # # Load model weights from the specified file
-    # model.load_weights(model_path)
-    tf.train.Checkpoint(model=model).restore(model_path)
-
+    model.load_weights(model_path)
+    
     # Test this model
     test_log = model.evaluate(
         dataset.test_data(hparams.batch_size),
