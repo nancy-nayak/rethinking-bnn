@@ -32,7 +32,7 @@ def train(build_model, dataset, hparams, logdir, name, observer, tb_graph):
                                 build_model.__name__,
                                 datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
         os.makedirs(model_dir, exist_ok=True)
-    model_path = os.path.join(model_dir, "model")
+    model_path = os.path.join(model_dir, "weights.h5")
     
 
     # Check if any observers are added for experiment.
@@ -72,8 +72,10 @@ def train(build_model, dataset, hparams, logdir, name, observer, tb_graph):
                 model.load_weights(model_path)
 
 
-        # Enable callbacks
-        cb = [callbacks.ModelCheckpoint(filepath=model_path, save_weights_only=True)]
+        cb = [
+            callbacks.SaveStats(model_dir=model_dir)
+        ]
+
         if tb_graph:
             # If tensorboard logging is enabled, write graph
             cb.extend(
@@ -115,9 +117,50 @@ def train(build_model, dataset, hparams, logdir, name, observer, tb_graph):
         # Save the model
         # not required as ModelCheckpoint already does this
 
-
     # Execute the experiment
     ex.execute()
+
+# Register train command and associated switches
+@cli.command()
+@build_train()
+def test(build_model, dataset, hparams, logdir):
+    # Check if the given directory already contains model
+    if os.path.exists(os.path.join(logdir, "stats.json")):
+        # then mark this as the directory to load weights from
+        model_dir = logdir
+    else:
+        # Raise Error
+        raise RuntimeError("No valid model stats file found in directory", logdir)
+		
+    model_path = os.path.join(model_dir, "model")
+
+    # Build model
+    model = build_model(hparams, **dataset.preprocessing.kwargs)
+    
+    # Compile model
+    model.compile(
+        optimizer=optimizers.make_optimizer(hparams.optimizer, hparams.opt_param),
+        loss="categorical_crossentropy",
+        metrics=["categorical_accuracy"]
+    )
+
+    # Print Summary of models
+    lq.models.summary(model)
+
+    # # Load model weights from the specified file
+    # model.load_weights(model_path)
+    tf.train.Checkpoint(model=model).restore(model_path)
+
+    # Test this model
+    test_log = model.evaluate(
+        dataset.test_data(hparams.batch_size),
+        steps = dataset.test_examples // hparams.batch_size
+    )
+
+    print("+Test Results--------------------+")
+    for (idx, metric) in enumerate(model.metrics_names):
+        print("| {:20s}    {:6.4f} |".format(metric, test_log[idx]))
+    print("+--------------------------------+")
 
 if __name__ == "__main__":
     cli()
