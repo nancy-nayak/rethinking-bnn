@@ -117,7 +117,7 @@ def train(build_model, dataset, hparams, logdir, name, observer, tb_graph):
     # Execute the experiment
     ex.execute()
 
-# Register train command and associated switches
+# Register test command and associated switches
 @cli.command()
 @build_train()
 def test(build_model, dataset, hparams, logdir):
@@ -152,10 +152,12 @@ def test(build_model, dataset, hparams, logdir):
         steps = dataset.test_examples // hparams.batch_size
     )
 
-    print("+Test Results--------------------+")
+    data = [["Metric", "Value"]]
     for (idx, metric) in enumerate(model.metrics_names):
-        print("| {:20s}    {:6.4f} |".format(metric, test_log[idx]))
-    print("+--------------------------------+")
+        data.append([metric, test_log[idx]])
+    
+    from terminaltables import AsciiTable
+    print(AsciiTable(data, title="Test Statistics").table)
 
 if __name__ == "__main__":
     cli()
