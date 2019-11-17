@@ -8,7 +8,7 @@ from zookeeper import registry, HParams
 @registry.register_model
 def bcnn(hparams, input_shape, num_classes):
     kwargs = dict(
-        input_quantizer="ste_sign",
+        input_quantizer=hparams.input_quantizer,
         kernel_quantizer=hparams.kernel_quantizer,
         kernel_constraint=hparams.kernel_constraint
     )
@@ -57,7 +57,7 @@ class default(HParams):
     kernel_constraint = "weight_clip"
     
     # Conv layer properties
-    filters = [64, 32, 16]
+    filters = [128, 256, 512]
     kernel_size = (3,3)
 
     # Pool layer properties
@@ -82,11 +82,67 @@ class default(HParams):
     )
 
 # Binarized VGG model
-@registry.register_hparams(bcnn)
-class bvgg(default):
-    # filters = [128, 128, 256, 256, 512, 512]
-    filters = [128, 256, 256, 512]
-    dense_units = [1024, 1024]
+@registry.register_model
+def binarynet(hparams, input_shape, num_classes):
+    kwargs = dict(
+        input_quantizer=hparams.input_quantizer,
+        kernel_quantizer=hparams.kernel_quantizer,
+        kernel_constraint=hparams.kernel_constraint
+    )
 
-
+    # Input layer
+    in_layer = tf.keras.layers.Input(shape=input_shape)
     
+    # First hidden layer
+    x = lq.layers.QuantConv2D(128, (3, 3),
+                                kernel_quantizer=hparams.kernel_quantizer,
+                                kernel_constraint=hparams.kernel_constraint,
+                                use_bias=False,
+                                input_shape=input_shape)(in_layer)
+    x = tf.keras.layers.BatchNormalization(scale=False)(x)
+    x = lq.layers.QuantConv2D(128, (3, 3), padding="same", **kwargs)(x)
+    x = tf.keras.layers.MaxPool2D(pool_size=(2, 2), strides=(2, 2))(x)
+    x = tf.keras.layers.BatchNormalization(scale=False)(x)
+
+    x = lq.layers.QuantConv2D(256, (3, 3), padding="same", **kwargs)(x)
+    x = tf.keras.layers.BatchNormalization(scale=False)(x)
+    x = lq.layers.QuantConv2D(256, (3, 3), padding="same", **kwargs)(x)
+    x = tf.keras.layers.MaxPool2D(pool_size=(2, 2), strides=(2, 2))(x)
+    x = tf.keras.layers.BatchNormalization(scale=False)(x)
+
+    x = lq.layers.QuantConv2D(512, (3, 3), padding="same", **kwargs)(x)
+    x = tf.keras.layers.BatchNormalization(scale=False)(x)
+    x = lq.layers.QuantConv2D(512, (3, 3), padding="same", **kwargs)(x)
+    x = tf.keras.layers.MaxPool2D(pool_size=(2, 2), strides=(2, 2))(x)
+    x = tf.keras.layers.BatchNormalization(scale=False)(x)
+
+    x = tf.keras.layers.Flatten()(x)
+
+    x = lq.layers.QuantDense(1024, **kwargs)(x)
+    x = tf.keras.layers.BatchNormalization(scale=False)(x)
+
+    x = lq.layers.QuantDense(1024, **kwargs)(x)
+    x = tf.keras.layers.BatchNormalization(scale=False)(x)
+
+    x = lq.layers.QuantDense(num_classes, **kwargs)(x)
+    x = tf.keras.layers.BatchNormalization(scale=False)(x)
+    out_layer = tf.keras.layers.Activation("softmax")(x)
+
+    return tf.keras.models.Model(inputs=in_layer, outputs=out_layer)
+
+@registry.register_hparams(binarynet)
+class default(HParams):
+    input_quantizer = "ste_sign"
+    kernel_quantizer = "ste_sign"
+    kernel_constraint = "weight_clip"
+    
+    # Training properties
+    epochs = 100
+    batch_size = 64
+
+    optimizer = "Adam"
+    opt_param = dict(
+        lr = 1e-3,
+        beta_1 = 0.99,
+        beta_2 = 0.999
+    )
