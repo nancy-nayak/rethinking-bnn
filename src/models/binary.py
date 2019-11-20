@@ -146,3 +146,16 @@ class default(HParams):
         beta_1 = 0.99,
         beta_2 = 0.999
     )
+
+@registry.register_hparams(binarynet)
+class bop(default):
+    kernel_quantizer = None
+    kernel_constraint = None
+    threshold = 1e-6
+    gamma = 1e-3
+
+    optimizer = "Bop"
+    opt_param = dict(
+        threshold=threshold,
+        gamma=gamma
+    )
