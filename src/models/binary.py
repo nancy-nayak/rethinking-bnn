@@ -147,6 +147,25 @@ class default(HParams):
         beta_2 = 0.999
     )
 
+
+@registry.register_hparams(binarynet)
+class latentweights(HParams):
+    input_quantizer = "ste_sign"
+    kernel_quantizer = None
+    kernel_constraint = None
+    
+    # Training properties
+    epochs = 100
+    batch_size = 64
+
+    optimizer = "Adam"
+    opt_param = dict(
+        lr = 1e-3,
+        beta_1 = 0.99,
+        beta_2 = 0.999
+    )
+
+
 @registry.register_hparams(binarynet)
 class bop(default):
     kernel_quantizer = None
@@ -158,4 +177,86 @@ class bop(default):
     opt_param = dict(
         threshold=threshold,
         gamma=gamma
+    )
+
+
+@registry.register_model
+def binaryvgg(hparams, input_shape, num_classes):
+    kwargs = dict(
+        input_quantizer=hparams.input_quantizer,
+        kernel_quantizer=hparams.kernel_quantizer,
+        kernel_constraint=hparams.kernel_constraint
+    )
+
+    # Decide which normalization to use
+    norm_lookup = {
+        "BatchNormalization": tf.keras.layers.BatchNormalization,
+        "LayerNormalization": tf.keras.layers.LayerNormalization
+    }
+    if not hparams.norm_layer in norm_lookup:
+        raise NotImplementedError("Unknown normalization layer {}".format(hparams.norm_layer))
+    # We know this normalization layer
+    normalization_layer = norm_lookup[hparams.norm_layer]
+
+    # Input layer
+    in_layer = tf.keras.layers.Input(shape=input_shape)
+    
+    # First hidden layer
+    x = lq.layers.QuantConv2D(128, (3, 3),
+                                kernel_quantizer=hparams.kernel_quantizer,
+                                kernel_constraint=hparams.kernel_constraint,
+                                use_bias=False,
+                                input_shape=input_shape)(in_layer)
+    x = normalization_layer(**hparams.norm_param)(x)
+    x = lq.layers.QuantConv2D(128, (3, 3), padding="same", **kwargs)(x)
+    x = tf.keras.layers.MaxPool2D(pool_size=(2, 2), strides=(2, 2))(x)
+    x = normalization_layer(**hparams.norm_param)(x)
+
+    x = lq.layers.QuantConv2D(256, (3, 3), padding="same", **kwargs)(x)
+    x = normalization_layer(**hparams.norm_param)(x)
+    x = lq.layers.QuantConv2D(256, (3, 3), padding="same", **kwargs)(x)
+    x = tf.keras.layers.MaxPool2D(pool_size=(2, 2), strides=(2, 2))(x)
+    x = normalization_layer(**hparams.norm_param)(x)
+
+    x = lq.layers.QuantConv2D(512, (3, 3), padding="same", **kwargs)(x)
+    x = normalization_layer(**hparams.norm_param)(x)
+    x = lq.layers.QuantConv2D(512, (3, 3), padding="same", **kwargs)(x)
+    x = tf.keras.layers.MaxPool2D(pool_size=(2, 2), strides=(2, 2))(x)
+    x = normalization_layer(**hparams.norm_param)(x)
+
+    x = tf.keras.layers.Flatten()(x)
+
+    x = lq.layers.QuantDense(1024, **kwargs)(x)
+    x = normalization_layer(**hparams.norm_param)(x)
+
+    x = lq.layers.QuantDense(1024, **kwargs)(x)
+    x = normalization_layer(**hparams.norm_param)(x)
+
+    x = lq.layers.QuantDense(num_classes, **kwargs)(x)
+    x = normalization_layer(**hparams.norm_param)(x)
+    out_layer = tf.keras.layers.Activation("softmax")(x)
+
+    return tf.keras.models.Model(inputs=in_layer, outputs=out_layer)
+
+@registry.register_hparams(binaryvgg)
+class default(HParams):
+    input_quantizer = "ste_sign"
+    kernel_quantizer = "ste_sign"
+    kernel_constraint = "weight_clip"
+
+    # Normalization 
+    norm_layer = "BatchNormalization"
+    norm_param = dict(
+        scale=False
+    )
+    
+    # Training properties
+    epochs = 250
+    batch_size = 64
+
+    optimizer = "Adam"
+    opt_param = dict(
+        lr = 1e-3,
+        beta_1 = 0.99,
+        beta_2 = 0.999
     )
