@@ -168,8 +168,10 @@ class latentweights(HParams):
 
 @registry.register_hparams(binarynet)
 class bop(default):
-    kernel_quantizer = None
-    kernel_constraint = None
+    input_quantizer = "ste_sign"
+    kernel_quantizer = "ste_sign"
+    kernel_constraint = "weight_clip"
+
     threshold = 1e-6
     gamma = 1e-3
 
@@ -259,4 +261,12 @@ class default(HParams):
         lr = 1e-3,
         beta_1 = 0.99,
         beta_2 = 0.999
+    )
+
+@registry.register_hparams(binaryvgg)
+class Bop(default):
+    optimizer = "Bop"
+    opt_param = dict(
+        threshold=1e-6,
+        gamma=1e-3
     )
