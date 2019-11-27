@@ -1,9 +1,11 @@
-# For training image classification models
+# For training Auto Encoder models
 
 import os, datetime, json
 
 import tensorflow as tf
 import larq as lq
+import tensorflow.keras.backend as K
+import math
 
 import click
 from zookeeper import cli, build_train
@@ -12,9 +14,11 @@ from experiment import Experiment
 import models, data, optimizers
 import callbacks
 
+import matplotlib.pyplot as plt
+
 # Register train command and associated switches
 @cli.command()
-@click.option("--name", default="Classify")
+@click.option("--name", default="AE")
 @click.option("--observer", default=None)
 @click.option("--tb-graph", is_flag=True)
 @build_train()
@@ -33,7 +37,6 @@ def train(build_model, dataset, hparams, logdir, name, observer, tb_graph):
                                 datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
         os.makedirs(model_dir, exist_ok=True)
     model_path = os.path.join(model_dir, "weights.h5")
-    
 
     # Check if any observers are added for experiment.
     # If not, add a file_storage observer
@@ -51,13 +54,18 @@ def train(build_model, dataset, hparams, logdir, name, observer, tb_graph):
     @ex.main
     def train(_run):
         # Build model
-        model = build_model(hparams, **dataset.preprocessing.kwargs)
+        model = build_model(hparams, **dataset.preprocessing.kwargs) 
+
+        # Custom metric
+        def PSNR(y_true, y_pred):
+            max_pixel = 1.0
+            return (10.0 * K.log((max_pixel ** 2) / (K.mean(K.square(y_pred - y_true), axis=-1)))) / 2.303
         
         # Compile model
         model.compile(
             optimizer=optimizers.make_optimizer(hparams.optimizer, hparams.opt_param),
             loss="categorical_crossentropy",
-            metrics=["categorical_accuracy"]
+            metrics=[PSNR]
         )
 
         # Print Summary of models
@@ -102,8 +110,6 @@ def train(build_model, dataset, hparams, logdir, name, observer, tb_graph):
             )
         ])
 
-
-        # Train this mode
         train_log = model.fit(
                         dataset.train_data(hparams.batch_size),
                         epochs=hparams.epochs,
@@ -133,11 +139,16 @@ def test(build_model, dataset, hparams, logdir):
     # Build model
     model = build_model(hparams, **dataset.preprocessing.kwargs)
     
+    # Custom metric
+    def PSNR(y_true, y_pred):
+        max_pixel = 1.0
+        return (10.0 * K.log((max_pixel ** 2) / (K.mean(K.square(y_pred - y_true), axis=-1)))) / 2.303
+        
     # Compile model
     model.compile(
         optimizer=optimizers.make_optimizer(hparams.optimizer, hparams.opt_param),
         loss="categorical_crossentropy",
-        metrics=["categorical_accuracy"]
+        metrics=[PSNR]
     )
 
     # Print Summary of models
@@ -158,6 +169,47 @@ def test(build_model, dataset, hparams, logdir):
     
     from terminaltables import AsciiTable
     print(AsciiTable(data, title="Test Statistics").table)
+
+
+# Register visualization of pictures command 
+@cli.command()
+@build_train()
+def vispics(build_model, dataset, hparams, logdir):
+    # Check if the given directory already contains model
+    if os.path.exists(os.path.join(logdir, "stats.json")):
+        # then mark this as the directory to load weights from
+        model_dir = logdir
+    else:
+        # Raise Error
+        raise RuntimeError(f"No valid model stats file found in {logdir}")	
+    model_path = os.path.join(model_dir, "weights.h5")
+
+    # Build model
+    model = build_model(hparams, **dataset.preprocessing.kwargs)
+
+    # Custom metric
+    def PSNR(y_true, y_pred):
+        max_pixel = 1.0
+        return (10.0 * K.log((max_pixel ** 2) / (K.mean(K.square(y_pred - y_true), axis=-1)))) / 2.303
+        
+    # Compile model
+    model.compile(
+        optimizer=optimizers.make_optimizer(hparams.optimizer, hparams.opt_param),
+        loss="categorical_crossentropy",
+        metrics=[PSNR]
+    )
+
+    # Print Summary of models
+    lq.models.summary(model)
+
+    # # Load model weights from the specified file
+    model.load_weights(model_path)
+
+    print(dataset.test_data(hparams.batch_size))
+    exit()
+    (x_test_noisy, x_test) = dataset.test_data(hparams.batch_size).load_data()
+
+    
 
 if __name__ == "__main__":
 	cli()

@@ -264,7 +264,7 @@ class default(HParams):
     )
 
 @registry.register_hparams(binaryvgg)
-class Bop(default):
+class bop(default):
     optimizer = "Bop"
     opt_param = dict(
         threshold=1e-6,
