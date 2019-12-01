@@ -21,7 +21,7 @@ python cifar10LENET5.py
 
 ```
 ## Accuracy
-|-----------------------------------|----------|--------|
+
 | DataSet:MNIST                     | FullyCon | LENET5 |
 |-----------------------------------|----------|--------|
 | Training accuracy                 |  100.00% | 99.99% |
@@ -33,7 +33,7 @@ python cifar10LENET5.py
 | Training accuracy                 |  100.00% | 85.16% |
 | Test accuracy                     |  81.72%  | 64.99% |
 | Test accuracy with latent weights |  50.52%  | 54.62% |
-|-----------------------------------|----------|--------|
+
 
 
 
