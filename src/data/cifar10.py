@@ -3,7 +3,7 @@
 import tensorflow as tf
 from zookeeper import registry
 from .tasks import ImageClassification, AutoEncoding
-import numpy as np 
+
 
 @registry.register_preprocess("cifar10")
 class default(ImageClassification):
@@ -21,9 +21,10 @@ class default(ImageClassification):
 class AE(AutoEncoding):
     def inputs(self, data, training):
         image = data["image"]
-        noise_factor = 0.5
-        # if training:
-        #     # Resize and flip
-        image = image + noise_factor* np.random.normal(loc=0.0, scale=1.0, size=image.shape)
-            
-        return tf.cast(image, tf.float32) / (255.0 / 2.0) - 1.0
+        noise_factor = 0.1
+        return tf.clip_by_value((tf.cast(image, tf.float32) / (255.0 / 2.0) - 1.0 ) + noise_factor* tf.random.normal(shape=image.shape, mean=0.0, stddev=1.0), -1.0, 1.0)
+
+    def outputs(self, data, training):
+        image = data["image"]
+        noise_factor = 0.1
+        return tf.cast(image, tf.float32) / (255.0 / 2.0) - 1.0 

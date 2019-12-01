@@ -21,8 +21,7 @@ class AutoEncoding(Preprocessing):
     @property
     def kwargs(self):
         return{
-            "input_shape": self.features["image"].shape,
-            "num_classes": self.features["image"].shape
+            "image_shape": self.features["image"].shape
         }
     
     def inputs(self, data):

@@ -55,16 +55,20 @@ def train(build_model, dataset, hparams, logdir, name, observer, tb_graph):
     def train(_run):
         # Build model
         model = build_model(hparams, **dataset.preprocessing.kwargs) 
-
+        
+        
         # Custom metric
+        import math
         def PSNR(y_true, y_pred):
+            # print(K.mean(K.square(y_pred - y_true)))
+            # exit()
             max_pixel = 1.0
-            return (10.0 * K.log((max_pixel ** 2) / (K.mean(K.square(y_pred - y_true), axis=-1)))) / 2.303
+            return 10.0 * (1.0 / math.log(10)) * K.log((max_pixel ** 2) / (K.mean(K.square(y_pred - y_true))))
         
         # Compile model
         model.compile(
             optimizer=optimizers.make_optimizer(hparams.optimizer, hparams.opt_param),
-            loss="categorical_crossentropy",
+            loss="mse",
             metrics=[PSNR]
         )
 
@@ -140,14 +144,15 @@ def test(build_model, dataset, hparams, logdir):
     model = build_model(hparams, **dataset.preprocessing.kwargs)
     
     # Custom metric
+    import math
     def PSNR(y_true, y_pred):
         max_pixel = 1.0
-        return (10.0 * K.log((max_pixel ** 2) / (K.mean(K.square(y_pred - y_true), axis=-1)))) / 2.303
+        return 10.0 * (1.0 / math.log(10)) * K.log((max_pixel ** 2) / (K.mean(K.square(y_pred - y_true))))
         
     # Compile model
     model.compile(
         optimizer=optimizers.make_optimizer(hparams.optimizer, hparams.opt_param),
-        loss="categorical_crossentropy",
+        loss="mse",
         metrics=[PSNR]
     )
 
@@ -171,6 +176,7 @@ def test(build_model, dataset, hparams, logdir):
     print(AsciiTable(data, title="Test Statistics").table)
 
 
+
 # Register visualization of pictures command 
 @cli.command()
 @build_train()
@@ -188,27 +194,143 @@ def vispics(build_model, dataset, hparams, logdir):
     model = build_model(hparams, **dataset.preprocessing.kwargs)
 
     # Custom metric
+    import math
     def PSNR(y_true, y_pred):
         max_pixel = 1.0
-        return (10.0 * K.log((max_pixel ** 2) / (K.mean(K.square(y_pred - y_true), axis=-1)))) / 2.303
-        
+        return 10.0 * (1.0 / math.log(10)) * K.log((max_pixel ** 2) / (K.mean(K.square(y_pred - y_true))))
+            
     # Compile model
     model.compile(
         optimizer=optimizers.make_optimizer(hparams.optimizer, hparams.opt_param),
-        loss="categorical_crossentropy",
+        loss="mse",
         metrics=[PSNR]
     )
 
-    # Print Summary of models
-    lq.models.summary(model)
+    # # Print Summary of models
+    # lq.models.summary(model)
 
-    # # Load model weights from the specified file
+    viz_model = tf.keras.models.Model(inputs=model.input,
+                                        outputs=[model.input, model.output])
+    
+    # Load model weights from the specified file
     model.load_weights(model_path)
 
-    print(dataset.test_data(hparams.batch_size))
-    exit()
-    (x_test_noisy, x_test) = dataset.test_data(hparams.batch_size).load_data()
+    n_samples = 10000
+    recon_imgs = viz_model.predict(dataset.test_data(n_samples), steps = 1)
 
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+
+
+    ### Uncomment this if u want Comparison of reconstructed images
+    ### using BAE+BOP with actual images =================================================================
+    
+    PSNR = np.zeros(n_samples)
+    for idx in range(n_samples):
+        print(idx)
+        loss, psnr = model.evaluate(np.expand_dims(recon_imgs[1][idx,:,:,:], axis=0), np.expand_dims(recon_imgs[0][idx,:,:,:], axis=0))
+        PSNR[idx] = psnr
+
+    idxsorted = np.argsort(PSNR)
+    
+    idx0 = idxsorted[0]
+    idx1 = idxsorted[1]
+    idx4999 = idxsorted[int(n_samples/2-1)]
+    idx9998 = idxsorted[n_samples-2]
+    idx9999 = idxsorted[n_samples-1]
+    print(idx0, idx1, idx4999, idx9998, idx9999)
+
+    fig, ax = plt.subplots(2,5, figsize=(7, 3.5))  
+    # Plot the 5 samples 
+    ax[0,0].imshow(0.50 * (recon_imgs[0][idx0,:,:,:]+1))
+    ax[0,0].set_ylabel('Noisy image')
+    ax[1,0].imshow(0.50 * (recon_imgs[1][idx0,:,:,:]+1))
+    ax[1,0].set_xlabel('PSNR = {0:.2f}'.format(PSNR[idx0]))
+    ax[1,0].set_ylabel('BAE w/ BOP')
+
+    ax[0,1].imshow(0.50 * (recon_imgs[0][idx1,:,:,:]+1))
+    ax[1,1].imshow(0.50 * (recon_imgs[1][idx1,:,:,:]+1))
+    ax[1,1].set_xlabel('PSNR = {0:.2f}'.format(PSNR[idx1]))
+
+    ax[0,2].imshow(0.50 * (recon_imgs[0][idx4999,:,:,:]+1))
+    ax[1,2].imshow(0.50 * (recon_imgs[1][idx4999,:,:,:]+1))
+    ax[1,2].set_xlabel('PSNR = {0:.2f}'.format(PSNR[idx4999]))
+
+    ax[0,3].imshow(0.50 * (recon_imgs[0][idx9998,:,:,:]+1))
+    ax[1,3].imshow(0.50 * (recon_imgs[1][idx9998,:,:,:]+1))
+    ax[1,3].set_xlabel('PSNR = {0:.2f}'.format(PSNR[idx9998]))
+
+    ax[0,4].imshow(0.50 * (recon_imgs[0][idx9999,:,:,:]+1))
+    ax[1,4].imshow(0.50 * (recon_imgs[1][idx9999,:,:,:]+1))
+    ax[1,4].set_xlabel('PSNR = {0:.2f}'.format(PSNR[idx9999]))
+
+    fig.savefig("./../results/BAEBOPfigsbestworst.pdf", format = 'pdf', bbox_inches = 'tight' )
+    plt.show()
+
+    exit()
+
+    ## Once u find the five indeces use them to find the reconstructed figures with AE+Adam and BAE+Adam
+    idx0 = 2590
+    idx1 = 6869
+    idx4999 = 4728
+    idx9998 = 8264
+    idx9999 = 9701
+
+    # #### Uncomment this if u want BAE+Adam =====================================================
+    # fig, ax = plt.subplots(1,5, figsize=(7, 2))  
+    # # Test this model
+
+    # loss, psnr = model.evaluate(np.expand_dims(recon_imgs[1][idx0,:,:,:], axis=0), np.expand_dims(recon_imgs[0][idx0,:,:,:], axis=0))
+    # ax[0].imshow(0.50 * (recon_imgs[1][idx0,:,:,:]+1))
+    # ax[0].set_xlabel('PSNR = {0:.2f}'.format(psnr))
+    # ax[0].set_ylabel('BAE w/ Adam')
+
+    # loss, psnr = model.evaluate(np.expand_dims(recon_imgs[1][idx1,:,:,:], axis=0), np.expand_dims(recon_imgs[0][idx1,:,:,:], axis=0))
+    # ax[1].imshow(0.50 * (recon_imgs[1][idx1,:,:,:]+1))
+    # ax[1].set_xlabel('PSNR = {0:.2f}'.format(psnr))
+
+    # loss, psnr = model.evaluate(np.expand_dims(recon_imgs[1][idx4999,:,:,:], axis=0), np.expand_dims(recon_imgs[0][idx4999,:,:,:], axis=0))
+    # ax[2].imshow(0.50 * (recon_imgs[1][idx4999,:,:,:]+1))
+    # ax[2].set_xlabel('PSNR = {0:.2f}'.format(psnr))
+
+    # loss, psnr = model.evaluate(np.expand_dims(recon_imgs[1][idx9998,:,:,:], axis=0), np.expand_dims(recon_imgs[0][idx9998,:,:,:], axis=0))
+    # ax[3].imshow(0.50 * (recon_imgs[1][idx9998,:,:,:]+1))
+    # ax[3].set_xlabel('PSNR = {0:.2f}'.format(psnr))
+
+    # loss, psnr = model.evaluate(np.expand_dims(recon_imgs[1][idx9999,:,:,:], axis=0), np.expand_dims(recon_imgs[0][idx9999,:,:,:], axis=0))
+    # ax[4].imshow(0.50 * (recon_imgs[1][idx9999,:,:,:]+1))
+    # ax[4].set_xlabel('PSNR = {0:.2f}'.format(psnr))
+
+    # fig.savefig("./../results/BAEAdamfigsbestworst.pdf", format = 'pdf', bbox_inches = 'tight' )
+    # plt.show()
+
+    # #### Uncomment this if u want BAE+BOP =============================================================
+    # fig, ax = plt.subplots(1,5, figsize=(7, 2))  
+   
+    # loss, psnr = model.evaluate(np.expand_dims(recon_imgs[1][idx0,:,:,:], axis=0), np.expand_dims(recon_imgs[0][idx0,:,:,:], axis=0))
+    # ax[0].imshow(0.50 * (recon_imgs[1][idx0,:,:,:]+1))
+    # ax[0].set_xlabel('PSNR = {0:.2f}'.format(psnr))
+    # ax[0].set_ylabel('AE w/ Adam')
+
+    # loss, psnr = model.evaluate(np.expand_dims(recon_imgs[1][idx1,:,:,:], axis=0), np.expand_dims(recon_imgs[0][idx1,:,:,:], axis=0))
+    # ax[1].imshow(0.50 * (recon_imgs[1][idx1,:,:,:]+1))
+    # ax[1].set_xlabel('PSNR = {0:.2f}'.format(psnr))
+
+    # loss, psnr = model.evaluate(np.expand_dims(recon_imgs[1][idx4999,:,:,:], axis=0), np.expand_dims(recon_imgs[0][idx4999,:,:,:], axis=0))
+    # ax[2].imshow(0.50 * (recon_imgs[1][idx4999,:,:,:]+1))
+    # ax[2].set_xlabel('PSNR = {0:.2f}'.format(psnr))
+
+    # loss, psnr = model.evaluate(np.expand_dims(recon_imgs[1][idx9998,:,:,:], axis=0), np.expand_dims(recon_imgs[0][idx9998,:,:,:], axis=0))
+    # ax[3].imshow(0.50 * (recon_imgs[1][idx9998,:,:,:]+1))
+    # ax[3].set_xlabel('PSNR = {0:.2f}'.format(psnr))
+
+    # loss, psnr = model.evaluate(np.expand_dims(recon_imgs[1][idx9999,:,:,:], axis=0), np.expand_dims(recon_imgs[0][idx9999,:,:,:], axis=0))
+    # ax[4].imshow(0.50 * (recon_imgs[1][idx9999,:,:,:]+1))
+    # ax[4].set_xlabel('PSNR = {0:.2f}'.format(psnr))
+
+    # fig.savefig("./../results/AEAdamfigsbestworst.pdf", format = 'pdf', bbox_inches = 'tight' )
+    # plt.show()
     
 
 if __name__ == "__main__":
