@@ -9,7 +9,7 @@ Thanks to CodeOcean and Google colaboratory for compute support.
 - [Tensorflow](https://www.tensorflow.org/install) version '2.0.0'
 - [Larq](https://github.com/plumerai/larq) version '0.8.2'
 - [Zookeeper](https://github.com/plumerai/zookeeper) version '0.5.5'
-- [sacred] (https://github.com/IDSIA/sacred) version '0.8.0'
+- [Sacred](https://github.com/IDSIA/sacred) version '0.8.0'
 
 
 # Reproduce paper experiments
