@@ -113,3 +113,4 @@ python plot.py
 ```
 keeping `DenoisingAE = 1`, and giving proper filepath (e.g. for BOP `./../zoo/cifar10/denoisingAE/bop/cifar10/binaryae`) for the trained models.
 
+This work is done for NeurIPS reproducibility challenge 2019 and the report can be found -[here](https://openreview.net/pdf?id=y53aaSM5o).
