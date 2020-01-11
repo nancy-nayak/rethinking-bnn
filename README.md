@@ -1,5 +1,6 @@
 # Rethinking-bnn
-Repository for NIPS Reproducibility Challenge 2019 for the paper titled "Latent Weights Do Not Exist: Rethinking Binarized Neural Network Optimization"
+Repository for NIPS Reproducibility Challenge 2019 for the paper titled "Latent Weights Do Not Exist: Rethinking Binarized Neural Network Optimization" and the report is named "A comprehensive study on binary optimizer and its applicability", can be found [here](https://openreview.net/pdf?id=y53aaSM5o).
+
 
 Thanks to [CodeOcean](https://codeocean.com/) and [Google colaboratory](https://colab.research.google.com/notebooks/welcome.ipynb) for compute support.
 
@@ -113,4 +114,3 @@ python plot.py
 ```
 keeping `DenoisingAE = 1`, and giving proper filepath (e.g. for BOP `./../zoo/cifar10/denoisingAE/bop/cifar10/binaryae`) for the trained models.
 
-This work is done for NeurIPS reproducibility challenge 2019 and the report can be found -[here](https://openreview.net/pdf?id=y53aaSM5o).
