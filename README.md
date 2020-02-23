@@ -114,7 +114,8 @@ python plot.py
 ```
 keeping `DenoisingAE = 1`, and giving proper filepath (e.g. for BOP `./../zoo/cifar10/denoisingAE/bop/cifar10/binaryae`) for the trained models.
 
-If you find the content useful please cite our work.
+### Citing this work
+If you find the content useful please use the following citation.
 ```@article{nayak2019comprehensive,
   title={A comprehensive study on binary optimizer and its applicability},
   author={Nayak, Nancy and Raj, Vishnu and Kalyani, Sheetal},
